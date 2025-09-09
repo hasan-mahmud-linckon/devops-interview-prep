@@ -228,6 +228,134 @@ Yes. The SaaS application at Penciltech is built with **Laravel (PHP)** and host
 
 This architecture ensures consistency across environments, improves scalability, and enables rapid, reliable deployments.
 
+## 🔹 17. Walk me through how your SSL renewal script works.
+
+**Answer:**  
+At Penciltech, I built a fully automated SSL renewal system for our Dockerized Laravel app behind Nginx. Here’s how it works:
+
+1. **Discover Domains**:  
+   The script scans `/etc/letsencrypt/live/` to find all domains with existing certs — no hardcoding needed.
+
+2. **Prepare Volumes**:  
+   Ensures each domain has a directory in `/home/rdssl`, which is mounted into the Nginx container.
+
+3. **Stop Nginx**:  
+   Temporarily stops the `webserver` container to free port 80 for Certbot’s `--standalone` mode.
+
+4. **Renew Certs**:  
+   Runs `certbot renew --standalone`, which automatically renews any cert within 30 days of expiry.
+
+5. **Restart & Stabilize**:  
+   Starts the container and waits up to 60 seconds to confirm it’s running.
+
+6. **Copy & Reload**:  
+   Copies renewed `fullchain.pem` and `privkey.pem` to `/home/rdssl/domain/`, sets secure permissions, then reloads Nginx gracefully with `nginx -s reload`.
+
+It runs twice daily via cron and has eliminated all SSL expiry incidents.
+
+---
+
+## 🔹 18. Why do you stop and start the Nginx container instead of using `--webroot`?
+
+**Answer:**  
+I chose `--standalone` over `--webroot` for **simplicity and reliability** in our Docker setup.
+
+- With `--webroot`, Nginx must serve ACME challenges from `.well-known/`. This requires:
+  - Extra config in Nginx.
+  - Risk of misconfiguration or routing conflicts.
+  - Challenge files must be accessible during renewal.
+
+- With `--standalone`, Certbot runs its own lightweight server on port 80 — **no Nginx involvement**.
+
+Yes, it requires a brief stop of Nginx (~10 seconds), but since renewal only happens every ~60 days and we run it off-peak, the minimal downtime is acceptable.
+
+For high-availability systems, I’d consider `--webroot` or load-balanced setups — but for single-server Docker, `--standalone` is cleaner and more reliable.
+
+---
+
+## 🔹 19. Why not mount `/etc/letsencrypt` directly into the Nginx container?
+
+**Answer:**  
+Great question — this is a **security and operational best practice**.
+
+Mounting `/etc/letsencrypt` directly would expose:
+- Private keys (`privkey.pem`)
+- Account private keys
+- Full certificate chain history
+
+This increases the **attack surface** if the container is compromised.
+
+Instead, I use a **secure copy pattern**:
+1. Certbot manages certs on the **host** (`/etc/letsencrypt`).
+2. After renewal, only the **latest `fullchain.pem` and `privkey.pem`** are copied to `/home/rdssl/domain/`.
+3. `/home/rdssl` is the **only volume mounted** into the container.
+
+This follows the **principle of least privilege** — the container gets only what it needs.
+
+---
+
+## 🔹 20 How do you ensure the Nginx container restarts successfully?
+
+**Answer:**  
+I built in **resilience and recovery**:
+
+- After `docker compose start`, I call `wait_for_stable_container()` — a loop that checks container status every second for up to 60 seconds.
+- If the container doesn’t become “running”, it triggers `handle_error()`.
+- `handle_error()` logs the issue and attempts a `docker compose restart` to recover.
+- All actions are logged to `/var/log/ssl-renewal.log` for audit and debugging.
+
+This ensures the system **self-heals** from transient failures — like slow startup due to high load or disk I/O.
+
+---
+
+## 🔹 21. How does the script handle multiple domains?
+
+**Answer:**  
+The script is **fully dynamic and domain-agnostic**:
+
+- It uses `discover_domains()` to scan `/etc/letsencrypt/live/` and build a list of domains.
+- For each domain, it ensures a directory exists in `/home/rdssl/`.
+- During renewal, Certbot renews **all eligible certs** in one run.
+- After renewal, it loops through each domain and copies the updated certs.
+
+So when a new domain is added:
+1. Run `certbot certonly --standalone -d newdomain.com` once.
+2. The script **automatically detects it** on the next run.
+3. No code or config changes needed.
+
+This makes the system **scalable and low-maintenance**.
+
+---
+
+## 🔹 22. What happens if Certbot fails to renew a certificate?
+
+**Answer:**  
+The script handles failures gracefully:
+
+- It captures `certbot` exit code in `RENEWAL_RESULT`.
+- If non-zero, it **logs the error** but still starts the Nginx container to restore service.
+- It does **not** attempt to copy or reload certs — avoids applying partial/incomplete updates.
+- The error is logged, and the system will retry in 12 hours.
+
+Since Let’s Encrypt allows ~5 failed attempts per week, temporary failures (e.g., network issues) are safe. I also monitor logs and get alerts if renewal fails repeatedly.
+
+---
+
+## 🔹 23. Why do you reload Nginx instead of restarting it?
+
+**Answer:**  
+Because `nginx -s reload` performs a **graceful reload**:
+
+- New worker processes start with the updated SSL certs.
+- Old workers continue serving existing connections until they complete.
+- **No dropped connections or downtime**.
+
+A full `restart` would briefly interrupt active sessions — not acceptable for a production SaaS platform.
+
+So after copying the new certs, I run:
+```bash
+docker compose exec webserver nginx -s reload
+
 ## Bonus: Quick-Fire Technical Questions
 
 | Question | Answer |
