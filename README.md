@@ -353,8 +353,53 @@ Because `nginx -s reload` performs a **graceful reload**:
 A full `restart` would briefly interrupt active sessions — not acceptable for a production SaaS platform.
 
 So after copying the new certs, I run:
+
 ```bash
 docker compose exec webserver nginx -s reload
+```
+---
+
+## 🔹 24. Describe the Laravel application architecture.
+
+**Answer:**
+The core architecture is containerized and service-oriented, leveraging Docker for consistency and AWS for managed services. 
+
+Here’s a breakdown of the key components: 
+
+   1. Frontend & Application Layer (Dockerized): 
+       - The Laravel application runs within a Docker container using PHP-FPM.
+       - It is served by an Nginx container acting as a reverse proxy and web server, handling HTTP/HTTPS traffic and static assets.
+       - These two services are orchestrated together using Docker Compose on an AWS EC2 instance, ensuring the application environment is consistent and reproducible.
+         
+
+   2. Database Layer (AWS RDS): 
+        - Instead of a self-managed MySQL container, I migrated the database to Amazon RDS (MySQL).
+        - This provides high availability (with Multi-AZ deployment), automated backups, point-in-time recovery, and managed patching, significantly improving data reliability and reducing operational overhead.
+         
+
+   3. Storage Layer (AWS S3): 
+       - User-uploaded files and static assets are stored in Amazon S3.
+       - This provides a highly durable, scalable, and secure object storage solution, decoupling storage from the application servers.
+         
+     
+    4. Caching & Queue Processing: 
+        - Redis is used for caching (e.g., config, routes) and as a queue driver to handle background jobs like sending emails or processing data, improving application performance and responsiveness.
+         
+
+   5. CI/CD & Automation: 
+       - I established CI/CD pipelines using GitHub Actions to automate the build, test, and deployment process.
+       - Ansible playbooks are used to provision and configure the EC2 servers, ensuring infrastructure consistency.
+       - Terraform is used to define the core AWS infrastructure (VPC, EC2, RDS, S3) as code.
+         
+
+    6. Security & Observability: 
+        - SSL/TLS certificates from Let's Encrypt are automated using a custom Bash script and cron on the host, which stops the Nginx container, renews the certs, and restarts it, preventing any expiry incidents.
+        - For monitoring and troubleshooting, I deployed Grafana Loki to aggregate logs from both the Laravel application and Nginx, enabling real-time log searching and faster issue resolution.
+        - Secrets like database credentials are managed securely using AWS SSM Parameter Store.
+              
+In summary, the architecture is a modern, cloud-optimized setup: a Dockerized Laravel app on EC2 talking to managed services (RDS, S3), with automated deployments (GitHub Actions, Ansible) and centralized logging (Loki), all designed for scalability, reliability, and ease of maintenance.
+
+---
 
 ## Bonus: Quick-Fire Technical Questions
 
