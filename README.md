@@ -215,6 +215,19 @@ I aim to grow into a **Senior DevOps or Cloud Architect** role, leading cloud tr
 
 ---
 
+## 16. Can you describe the architecture of the Laravel application you deployed at Penciltech? 
+
+**Answer:**  
+Yes. The SaaS application at Penciltech is built with **Laravel (PHP)** and hosted on **AWS**, migrated from VPS to a scalable, containerized setup. The core components include:
+
+- **Docker** containers for `nginx` (reverse proxy) and `php-fpm` (PHP processing).
+- **Docker Compose** to orchestrate services locally and in production.
+- **AWS EC2** for container hosting, **RDS (MySQL)** for managed database, and **S3** for secure file storage.
+- **GitHub Actions** for CI/CD, with pipelines triggering builds and deployments.
+- **Grafana Loki** for centralized logging of Laravel and Nginx logs.
+
+This architecture ensures consistency across environments, improves scalability, and enables rapid, reliable deployments.
+
 ## Bonus: Quick-Fire Technical Questions
 
 | Question | Answer |
@@ -227,6 +240,8 @@ I aim to grow into a **Senior DevOps or Cloud Architect** role, leading cloud tr
 | **What is a sidecar container?** | A helper container in the same pod (e.g., for logging or monitoring). |
 
 ---
+For more details follow below link:
+https://chat.qwen.ai/c/aaa430b7-735e-476a-a294-68dd40e41ad7
 
 ## 💡 Tips for the Interview
 - **Use the STAR method**: Situation, Task, Action, Result.
